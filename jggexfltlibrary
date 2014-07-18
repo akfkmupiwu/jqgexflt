@@ -1,6 +1,6 @@
 //Custom Header Search 
 (function ($) {
-Alert("I am IN")
+Alert("I am IN");
 	$.extend({
 		EnableHeaderSeach: function (_this, lookfn) {
 			$(document).off("click", ".SearchableCol", H_nwcs_C_JQgrid_H_SClick).on("click", ".SearchableCol", H_nwcs_C_JQgrid_H_SClick);

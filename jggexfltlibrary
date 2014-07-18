@@ -1,0 +1,634 @@
+//Custom Header Search 
+(function ($) {
+	$.extend({
+		EnableHeaderSeach: function (_this, lookfn) {
+			$(document).off("click", ".SearchableCol", H_nwcs_C_JQgrid_H_SClick).on("click", ".SearchableCol", H_nwcs_C_JQgrid_H_SClick);
+			var $nwcsgrid = _this;
+			var col = $nwcsgrid.getGridParam('colModel');
+			var cn = $nwcsgrid.getGridParam('colNames');
+			var gridId = $(_this).attr('id');
+			$("#" + gridId)[0].p.data.lookUpFunction = lookfn;
+
+			$(col).each(function (x) {
+				var c = this;
+				if (c.classes && c.classes.indexOf("jqgrid-Exfilter-omit") >= 0) return;
+				if (((!c.hidden) || c.sortable) && !(c['name'] == 'subgrid')) {
+					$(".nwcsMainDiv").remove().end();
+					$("#nwcs_srchI" + c['name']).remove().end();
+					$nwcsgrid.jqGrid('setLabel', c['name'], createSearchSpan(cn[x], c['name'], gridId));
+				}
+			});
+
+			window.AppSearhesStack = Enumerable.Empty().ToDictionary();
+		}
+	});
+
+	var H_nwcs_C_JQgrid_H_SClick = function () {
+		var img = this;
+		var tSF = 0;
+		var sd = $(img).attr("colName");
+		var $g = $(img).attr("HjQGrid");
+		var $gJid = '#' + $g;
+		var jdP;
+		var isFrmtr = "";
+		var colM = $($gJid).getGridParam('colModel');
+		var frmtr;
+		var sdiv;// Parent Div created
+		var filter;
+		var cc;
+		var op = [];
+		var ddOpText = "";
+		var nonBlankVals = 0;
+		var BlankVals = 0;
+
+		//hide other open searches
+		$(".nwcsMainDiv").not('.nwcs_PD' + sd).hide();
+
+		//If aleardy open and again click on same search then hide and return
+		if ($('#nwcs_PD' + sd).length > 0) {
+			$('.nwcs_PD' + sd).toggle();
+			if (!$('.nwcs_PD' + sd).is(":visible")) return;
+		}
+
+		// Preserve grid data for searching
+		if (window.AppSearhesStack.count == 0) {
+			window.AppSearhesStack = Enumerable.Empty().ToDictionary();
+			window.nwcs_jqdata = GetUpdatedGridDataSet($gJid, sd);
+
+		}
+
+		// Get Col Model
+		cc = Enumerable.From($(colM)).Where('x=> x.name == "' + sd + '"').FirstOrDefault();
+		var filterType = "WC";
+		if ($(cc).prop("classes") && $(cc).prop("classes").indexOf("jqgrid-Exfilter") >= 0) // If Drop down search then get JGgrid data
+		{
+			filterType = $(cc).prop("classes");
+			filter = getFilter('x', sd);
+			jdP = Enumerable.From(GetUpdatedEntireGridDataSet(window.nwcs_jqdata, sd)).Where(filter).Select('x=>"" + x.' + sd).Distinct();
+
+			if (cc.formatter && cc.formatter == "checkbox") {
+				jdP = jdP.Select('x=>(eval(x) ? 1:0) ').Distinct();
+			}
+		}
+
+		var lookfn = $($gJid)[0].p.data.lookUpFunction || getOptionsValue;
+
+		if (filterType != "WC" && typeof (lookfn) == "function") {
+			op = lookfn(sd);
+		}
+
+		if ($('#nwcs_PD' + sd).length) $('#nwcs_PD' + sd).remove(); //if Tool Bar not created then remove
+
+
+		sdiv = document.createElement("div");// Parent Div created
+		Osdiv = $(sdiv);
+		Osdiv.attr("id", "nwcs_PD" + sd);
+		Osdiv.addClass("nwcsMainDiv");
+		Osdiv.addClass("nwcs_PD" + sd);
+
+		var position = $(img).offset();
+
+		if (position.left > 1210) {
+			$(Osdiv).css({ left: 1250, top: 40 });
+		}
+		else {
+			$(Osdiv).css({ left: position.left - 20, top: 40 });
+		}
+
+		//Wild Card Text Search Input Box
+		var ss = '<p class="forserchfld dispnone" id="nwcs_pWS' + sd + '"	><span>Text Search:</span>' +
+			'<input autocomplete="on" type="search" name="nwcs_txtWS' + sd + '" id="nwcs_txtWS' + sd + '" value="' + (window.AppSearhesStack.Get(sd) ? window.AppSearhesStack.Get(sd).svOrg : '') + '"/> </p>';
+		// btnWS + Search Option Div end
+
+		// If Select control then make multi select						
+		if (filterType != "WC") {
+			isFrmtr = 1;
+			ss = ss + '<div class="srchoption dispnone" id="nwcs_soDIV' + sd + '" >Search Options:<br>';
+			ss = ss + '<select  id="nwcs_so' + sd + '">';// Parent Div created
+			ss = ss + '<option class="_selectAll" value="~0">Select All</option>';
+			var tSS = '';
+			jdP.Do(function (x) {
+				(op && op.length > 0) ? ddOpText = getTextBasedOnValEx(op, ToSearchStringEx(x)) : ddOpText = x;
+
+				if (ToSearchStringEx(ddOpText) != "~BL" && x != "") {
+					nonBlankVals = 1;
+					tSS = tSS + '<option value="' + x + '" >' + ddOpText + '</option>';
+				}
+				else BlankVals = 1;
+
+			}).Force();
+
+			if (BlankVals && filterType.indexOf("-B") > -1) ss = ss + '<option value="~BL">Blank</option>'; // For a Blank Value Add Blank
+			if (nonBlankVals && filterType.indexOf("-NB") > -1) ss = ss + '<option value="~NB">Not Blank</option>'; // For a Non Blank Value Add Non Blank
+
+			if (sd == "GC" || sd == "Export" || sd == "AI") {
+				if (BlankVals) ss = ss + '<option value=0>Not Checked</option>'; // For a Blank Value Add Blank
+			}
+
+			//if (sd == "AI") {
+			//	if (BlankVals) ss = ss + '<option value="0">Not Checked</option>'; // For a Blank Value Add Blank
+			//}
+
+			if (sd == "PA") {
+				if (BlankVals) ss = ss + '<option value="~BL">Not Projected per configuration</option>'; // For a Blank Value Add Blank
+			}
+
+			//if (sd == "PI" && filterType.indexOf("-PI") == -1) {
+			//	if (BlankVals) ss = ss + '<option value="0">NSCC Projected(No)</option>'; // For a Blank Value Add Blank
+			//}
+
+			ss = ss + tSS + '</select>';
+		}
+		//Op btns
+		ss = ss + (isFrmtr ? '</div>' : '') + '<div class="clearfix"><input colName="' + sd + '" type="button"  HjQGrid="' + $g + '"  value="Close" id="nwcs_btnCl' + sd + '"/align="left">&nbsp;&nbsp; ';
+		ss = ss + '<input colName="' + sd + '" type="button"  HjQGrid="' + $g + '"  value="Clear" id="nwcs_btnClear' + sd + '"/align="left"> &nbsp;&nbsp;&nbsp;&nbsp;';
+		ss = ss + '<input  HjQGrid="' + $g + '"  colName="' + sd + '" type="button" value="OK" id="nwcs_btnS' + sd + '"/ align="left"> </div>';
+
+
+		$('#gbox_' + $g).append(Osdiv);
+		$('#nwcs_PD' + sd).append(ss);
+
+
+		$(document).off('click', '#' + 'nwcs_btnS' + sd).on('click', '#' + 'nwcs_btnS' + sd,
+				function () {
+					var gridId = $(this).attr('HjQGrid');
+					var isSA = 0;
+					if ($('#nwcs_soDIV' + $(this).attr('ColName')).is(":visible") == false) {
+						isSA = applyWildCardSeach(this, gridId);
+					}
+					else {
+						isSA = applyMultipleSeach(this, gridId);
+					}
+					if (isSA) $('[id=nwcs_srchI' + $(this).attr('ColName') + ']').attr('src', appPath + '/Images/ArrowDownIconFill15X15.png');
+
+					// After search hide the interface
+					$('#nwcs_PD' + sd).hide();
+				});
+
+		$(document).off('click', '#' + 'nwcs_btnCl' + sd).on('click', '#' + 'nwcs_btnCl' + sd,
+				function () {
+					$('#nwcs_PD' + sd).hide();
+				});
+
+		$(document).off('click', '#' + 'nwcs_btnClear' + sd).on('click', '#' + 'nwcs_btnClear' + sd,
+				function () {
+					var gridId = $(this).attr('HjQGrid');
+					ClearSearch(this, gridId);
+					$('[id=nwcs_srchI' + $(this).attr('ColName') + ']').attr('src', appPath + '/Images/ArrowDownIcon15X15.png');
+				});
+
+		$(document).off("click", "._selectAll", selectAll).on("click", "._selectAll", selectAll);
+
+		var totalVisibleChecked = 0;
+		var SA;
+		if (filterType != "WC") { // Selection Region
+			createNWCSMultiSelect(sd); // Create modified multiselect
+
+			if (!window.AppSearhesStack.Get(sd)) {
+				totalVisibleChecked = SelectExFilterAllItems(sd);
+			}
+			else {
+				var sso;
+				var selArr = [];
+
+				var totalA = 0;
+
+				sso = $("#nwcs_so" + sd);
+				selArr = window.AppSearhesStack.Get(sd) ? window.AppSearhesStack.Get(sd).selv : [];
+
+				// Mark Selected
+				Enumerable.From($(":checkbox", $('#nwcs_so' + sd).multiselect("widget"))).Do(function (x) {
+					if (x.value == "~0") SA = x;
+					else {
+						totalA++;
+						if ($.inArray(x.value, selArr) >= 0) {
+							x.checked = true;
+							totalVisibleChecked++;
+						} else x.checked = false;
+					}
+
+					//$(SA).prop("checked", totalVisibleChecked == totalA);
+				}).Force();
+				$(SA).prop("checked", (totalVisibleChecked > 0 && totalVisibleChecked == totalA));
+			}
+		}
+		//totalVisibleChecked = totalVisibleChecked == 1 ? ($(SA).prop("checked") ? 0:1) :totalVisibleChecked;
+		if (filterType == "WC" || totalVisibleChecked > 0) $("#nwcs_btnS" + sd).show();
+		else $("#nwcs_btnS" + sd).hide();
+
+		if (isFrmtr) {
+			$('#nwcs_soDIV' + sd).show();
+
+		}
+		else {
+			$('#nwcs_pWS' + sd).show();
+			$('#nwcs_txtWS' + sd).focus();
+		}
+	}
+
+	function handlenuCSClick(ui, event) {
+		if ($(ui).length > 0) {
+			var pid = $(ui)[0].target.id;
+			//var selArr = window.AppSearhesStack.Get(pid).selv;
+			var SA;
+			var chekedA = 0;
+			var totalA = 0;
+			var totalVisibleChecked = 0;
+
+			if (event.value != "~0") {
+				Enumerable.From($(":checkbox", $("#" + pid).multiselect("widget"))).Do(function (x) {
+					if ($(x).val() == "~0") {
+						SA = x;
+					}
+					else {
+						if (x.checked) {
+							chekedA++;
+							if ($(x).parent().parent().is(":visible")) {
+								totalVisibleChecked++;
+							}
+						}
+						totalA++;
+					}
+					//if (!x.checked) {
+					//	var selArr = window.AppSearhesStack.Get(pid.replace("nwcs_so", "")) ? window.AppSearhesStack.Get(pid.replace("nwcs_so", "")).selv : [];
+					//	if (selArr.indexOf(x.value) > -1) {
+					//		selArr.splice(selArr.indexOf(x.value), 1);
+					//	}
+					//}
+				}).Force();
+				$(SA).prop("checked", (chekedA > 0 && chekedA == totalA));
+			}
+		}
+
+		if (event.value != "~0") {
+			if (totalVisibleChecked > 0) $("#nwcs_btnS" + pid.replace("nwcs_so", "")).show();
+			else $("#nwcs_btnS" + pid.replace("nwcs_so", "")).hide();
+		}
+	}
+
+
+	function applyWildCardSeach(t, gridId) {
+		var jgid = $(t).attr('HjQGrid');
+		var colName = $(t).attr('colName');
+		var txtW = $("#nwcs_txtWS" + colName).val();
+		ApplySearch(jgid, colName, txtW, 'wc');
+		return 1;
+	}
+
+	function applyMultipleSeach(t, gridId) {
+		var jgid = $(t).attr('HjQGrid');
+		var colName = $(t).attr('colName');
+		var txtW = [];
+		for (i = 0; i < $("#nwcs_so" + colName).multiselect("getChecked").length; i++) {
+			if (!window.AppSearhesStack.Get(colName) && i == 0 && $("#nwcs_so" + colName).multiselect("getChecked")[i].value == "~0") return 0; // If All is selected then no filter
+			txtW.push($("#nwcs_so" + colName).multiselect("getChecked")[i].value ? $("#nwcs_so" + colName).multiselect("getChecked")[i].value : "");
+		}
+		ApplySearch(jgid, colName, txtW, 'ms');
+		return 1;
+	}
+
+	function ClearSearch(t, gridId) {
+		var sd = $(t).attr('colName');
+		$('#nwcs_PD' + sd).hide();
+		var nwft = new nwcsfilter();
+		nwft = window.AppSearhesStack.Get(sd);
+		if (nwft) {
+			window.AppSearhesStack.Remove(nwft.colName);
+			ApplySearch(gridId, null, "", nwft.ft);
+			//Finally Remove Search Control from DOM
+			$('#nwcs_PD' + sd).remove();
+		}
+	}
+
+	function createSearchSpan(c, colName, gridName) {
+		$('#jqgh_' + gridName + '_' + colName).parent().append('<img HjQGrid="'
+			+ gridName + '" id="nwcs_srchI' + colName + '" colName="' + colName + '" class="SearchableCol" src="' + appPath + '/Images/ArrowDownIcon15X15.png" /> ');
+	}
+
+	function ApplySearch(gridid, colName, value, ft) {
+
+		if (colName) {
+			var nf = new nwcsfilter();
+			nf.colName = colName;
+			nf.sv = value;
+			nf.ft = ft;
+			nf.svOrg = value;
+
+			if (nf.ft != "ms") {
+				if (value.indexOf("*") < 0) nf.ft = "";
+				if (value.indexOf(".") >= 0) nf.sv = nf.sv.replace(new RegExp('[.]', 'g'), '[.]');
+				if (value.indexOf("\\") >= 0) nf.sv = nf.sv.replace('\\', '');
+				if (value.indexOf("/") >= 0) nf.sv = nf.sv.replace(new RegExp('[/]', 'g'), '[/]');
+				if (value.indexOf("$") >= 0) nf.sv = nf.sv.replace(new RegExp('[$]', 'g'), '[$]');
+
+				if (value.indexOf("*") >= 0) nf.sv = nf.sv.replace(new RegExp('[*]', 'g'), '(.)');
+
+				var searchPart = nf.sv.split('(.)');
+				if (searchPart.length == 2) {
+					if (searchPart[0] == "") { nf.sv += '$'; }
+					if (searchPart[1] == "") { nf.sv = '^' + nf.sv; }
+				}
+			}
+
+			// Add Filter to Global Dictionary
+			var filteredData;
+			var tArr = [];
+			if (nf.ft == "ms") {
+				nf.selv = nf.sv;
+				//(window.AppSearhesStack.Get(colName) && window.AppSearhesStack.Get(colName).selv) ? nf.selv = window.AppSearhesStack.Get(colName).selv : nf.selv = [];
+				//tArr = nf.sv.split(",");
+
+				////Unique Merge
+				//Enumerable.From(tArr).Do(function (av) {
+				//	if (nf.selv.indexOf(av) == -1) nf.selv.push(av);
+				//}).Force();
+			}
+
+			window.AppSearhesStack.Add(colName, nf);
+		}
+		//If any filter applied then use
+		if (window.AppSearhesStack) {
+			var filter = getFilter('x');
+
+			filteredData = Enumerable.From(GetUpdatedEntireGridDataSet(window.nwcs_jqdata, colName)).Where(filter);
+		}
+		else { // else bind to initial data
+			filteredData = window.nwcs_jqdata;
+		}
+		var data;
+		try {
+			data = { page: 1, total: filteredData.Count(), records: 1, rows: filteredData.ToArray() };
+		} catch (e) {
+			filteredData = window.nwcs_jqdata;
+			data = { page: 1, total: filteredData.Count(), records: 1, rows: filteredData.ToArray() };
+		}
+
+		$('#' + gridid).jqGrid('setGridParam', { datatype: "jsonstring", datastr: data }).trigger('reloadGrid');
+
+	}
+
+	function getFilter(linqItem, ColumnToExclude) {
+		var tmpFilter = new nwcsfilter();
+		var filterResult = '';
+		var TempfilterResult = '';
+		var mv = [];
+		var index = 0;
+
+		//var regExR = new RegExp('/*', 'g');
+		if (window.AppSearhesStack) {
+
+			Enumerable.From(window.AppSearhesStack.ToEnumerable().To$()).Do(
+				function (x) {
+
+					tmpFilter = x.Value;
+					if (tmpFilter.colName != ColumnToExclude) {
+						if (tmpFilter.sv.indexOf('~0') >= 0) return "";
+
+						if (tmpFilter.ft == 'ms') {
+							mv = tmpFilter.sv;
+						}
+
+						if (index == 0) {
+
+							if (tmpFilter.ft == 'ms') {
+								$.each(mv, function (id, vl) {
+									if (id == 0) {
+										TempfilterResult = getNWCS_MFFCondition(tmpFilter, mv[id]);
+									}
+									else TempfilterResult += " || " + getNWCS_MFFCondition(tmpFilter, mv[id]);
+								});
+								filterResult = " (" + TempfilterResult + ") ";
+								TempfilterResult = "";
+							}
+							else {
+								filterResult = " (" + getNWCS_WCSFFCondition(tmpFilter) + ") ";
+							}
+						}
+
+						else {
+							if (tmpFilter.ft == 'ms') {
+								$.each(mv, function (id, vl) {
+									if (id == 0) TempfilterResult = getNWCS_MFFCondition(tmpFilter, mv[id]);
+									else TempfilterResult += " || " + getNWCS_MFFCondition(tmpFilter, mv[id]);
+								});
+								filterResult += " && (" + TempfilterResult + ")";
+								TempfilterResult = "";
+							}
+							else {
+								filterResult += " && (" + getNWCS_WCSFFCondition(tmpFilter) + ") ";
+							}
+						}
+						index++;
+					}
+				}).Force();
+		}
+		return filterResult ? "x=>" + filterResult : "";
+	}
+
+	function nwcsfilter() {
+		var colName = '';
+		var sv = '';
+		var svOrg = '';
+		var selv = [];
+		var ft = 'wc';
+	}
+
+	function getNWCS_MFFCondition(tmpFilter, mFval) {
+		var fr = "";
+
+		if (tmpFilter.colName == "Export" || tmpFilter.colName == "GC" || tmpFilter.colName == "PA") {
+			(mFval == "0" || mFval == "~BL") ? mFval = false : mFval = mFval;
+		}
+		if (mFval == "~BL") {
+			fr = "(!(x." + tmpFilter.colName + ") && (x." + tmpFilter.colName + ")!='0') "; // Blank
+		}
+		else if (mFval == "~NB") {
+			fr = "(x." + tmpFilter.colName + ")"; // Not Blank
+		}
+		else if (mFval === "true" || true === mFval) {
+			fr = "((x." + tmpFilter.colName + ")==1 || (x." + tmpFilter.colName + ")==true)"; //checked/true/1
+		}
+		else if (mFval == "false" || false === mFval) {
+			fr = "(!(x." + tmpFilter.colName + ")==true)"; // Blank/unchecked/null/0
+		}
+		else {
+			fr = "((x." + tmpFilter.colName + ") == '" + mFval + "') ";
+		}
+
+		return fr;
+	}
+
+	function getNWCS_WCSFFCondition(tmpFilter) {
+		var fr = "";
+		if (tmpFilter.ft == 'wc') { // Wild Card
+			fr = "((x." + tmpFilter.colName + ") && (x." + tmpFilter.colName + ").match(/" + tmpFilter.sv + "/i) != null)";
+		}
+		else { //equal
+			if (!(tmpFilter.sv) == true) fr = "(!(x." + tmpFilter.colName + ")==true)"; // Blank
+			else fr = "(x." + tmpFilter.colName + " == '" + tmpFilter.sv + "') ";
+		}
+		return fr;
+	}
+
+
+	// Get Text based on Value
+	function getTextBasedOnValEx(opList, val) {
+		if (opList) {
+			try {
+				if (opList.find) {
+					return '' + Enumerable.From(opList.find('option')).Where("x=>$(x).val()==" + val).Select("x=> $(x).prop('text')").FirstOrDefault();
+				}
+				else {
+					if (opList.indexOf(';') > -1) {
+						return Enumerable.From(opList.split(';')).Where('x=>eval(x.split(":")[0])==' + val).Select('x=>x.split(":")[1]').FirstOrDefault();
+					}
+					else {
+						return '' + $(opList).toEnumerable().Where("o=> o.val()==" + val).FirstOrDefault().text();
+					}
+				}
+			} catch (err) { }
+		}
+		return '';
+	}
+
+
+	var selectAll = function () {
+		var val = $(this).find('input:checkbox').is(':checked');
+		var pid = ($(this).parent().parent().parent()[0].id).replace("nwcs_soDIV", "nwcs_so");
+		var chkbox = $(this).parent().parent().find('input:checkbox');
+		if (chkbox.length > 1) {
+			Enumerable.From(chkbox).Do(function (x) {
+				$(x).prop('checked', val);
+			}).Force();
+			if ($("#" + pid).multiselect("getChecked").length > 0) $("#nwcs_btnS" + pid.replace("nwcs_so", "")).show();
+			else $("#nwcs_btnS" + pid.replace("nwcs_so", "")).hide();
+		} else $("#nwcs_btnS" + pid.replace("nwcs_so", "")).hide();
+	};
+
+	function GetUpdatedGridDataSet(gridId, sd) {
+		try {
+			if (typeof (ExposeGridDataSetsToExcelFilter) == "function") {
+				var dObj = new Object();
+				dObj.dataArg1 = Enumerable.Empty().ToDictionary();
+				dObj.dataArg2 = Enumerable.Empty().ToDictionary();
+				ExposeGridDataSetsToExcelFilter(dObj); // Get data sets, works for two data sets
+				var tpName = sd;
+
+				if (typeof (MapPropertyNameAndColModelIndex) == "function") {
+					tpName = MapPropertyNameAndColModelIndex(sd);
+				}
+				if (tpName) {
+					// Override Changed Data by Saved Data
+					if (typeof (CustomRecordComparer) == "function") {
+						var fExp = CustomRecordComparer(sd);
+						dObj.dataArg2.ToEnumerable().Join(Enumerable.From($(gridId)[0].p.data), fExp.outer, fExp.inner, 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+						dObj.dataArg1.ToEnumerable().Join(Enumerable.From($(gridId)[0].p.data), fExp.outer, fExp.inner, 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+					} else {
+						dObj.dataArg2.ToEnumerable().Join(Enumerable.From($(gridId)[0].p.data), 'o=>o.Key', 'i=>i.id', 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+						dObj.dataArg1.ToEnumerable().Join(Enumerable.From($(gridId)[0].p.data), 'o=>o.Key', 'i=>i.id', 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+					}
+				}
+			}
+		} catch (e) {
+			//alert(e.message)
+		}
+		return $(gridId)[0].p.data;
+	}
+
+	function GetUpdatedEntireGridDataSet(basedata, sd) {
+		try {
+			if (typeof (ExposeGridDataSetsToExcelFilter) == "function") {
+				var dObj = new Object();
+				dObj.dataArg1 = Enumerable.Empty().ToDictionary();
+				dObj.dataArg2 = Enumerable.Empty().ToDictionary();
+				ExposeGridDataSetsToExcelFilter(dObj); // Get data sets, works for two data sets
+				var tpName = sd;
+				var crc = '';
+				if (typeof (MapPropertyNameAndColModelIndex) == "function") {
+					tpName = MapPropertyNameAndColModelIndex(sd);
+				}
+				if (tpName) {
+					// Override Changed Data by Saved Data
+					if (typeof (CustomRecordComparer) == "function") {
+						var fExp = CustomRecordComparer(sd);
+						dObj.dataArg2.ToEnumerable().Join(Enumerable.From(basedata), fExp.outer, fExp.inner, 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+						dObj.dataArg1.ToEnumerable().Join(Enumerable.From(basedata), fExp.outer, fExp.inner, 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+					} else {
+						dObj.dataArg2.ToEnumerable().Join(Enumerable.From(basedata), 'o=>o.Key', 'i=>i.id', 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+						dObj.dataArg1.ToEnumerable().Join(Enumerable.From(basedata), 'o=>o.Key', 'i=>i.id', 'o,i=>{O:o, I:i }').Do("m=>m.I." + sd + " = m.O.Value." + tpName).Force();
+					}
+				}
+			}
+		} catch (e) {
+			//alert(e.message)
+		}
+		return basedata;
+	}
+
+
+
+	function createNWCSMultiSelect(sd) {
+		$('#nwcs_so' + sd).multiselect().multiselect("destroy");
+		$('#nwcs_so' + sd).multiselect({
+			autoOpen: true,
+			classes: 'AsListBox',
+			header: false,
+			position: {
+				my: 'left top',
+				at: 'left bottom',
+				collision: "none none"
+			},
+			height: '100px',
+			width: '210px',
+			show: true,
+			hide: false,
+			beforeclose: function (event, ui) {
+				return false;
+			},
+			close: function (event, ui) {
+
+			},
+			click: function (event, ui) {
+				handlenuCSClick(event, ui);
+			},
+			noneSelectedText: 'Select',
+			selectedText: function (nc, ntc, ac) {
+				if (nc > 1) {
+					return nc + " items selected";
+				} else {
+					return nc + " item selected";
+				}
+			}
+		});
+	}
+
+	function ToStringEx(val) {
+		if ((val == true || val == "true") && !(val === 1) && !(val === '1')) return true;
+		if ((val == false || val == "false") && !(val === "") && !(val === 0) && !(val === '0')) return false;
+		return ((val == undefined || val == null || val == "null" || val == "undefined" || !(val)) && val != '0') ? "''" : "'" + val + "'";
+	}
+
+	function ToSearchStringEx(val) {
+		if ((val == true || val == "true") && !(val === 1) && !(val === '1')) return true;
+		if ((val == false || val == "false") && !(val === "") && !(val === 0) && !(val === '0')) return false;
+		return ((val == undefined || val == null || val == "null" || val == "undefined" || !(val)) && val != '0') ? "~BL" : "'" + val + "'";
+	}
+
+
+	function SelectExFilterAllItems(cm) {
+		var totalChecked = 0;
+		var salUi;
+		Enumerable.From($(":checkbox", $('#nwcs_so' + cm).multiselect("widget"))).Do(function (x) {
+			if (x.value != "~0") {
+				totalChecked++;
+				x.checked = true;
+			}
+			else {
+				x.checked = false;
+				salUi = x;
+			}
+		}).Force();
+		if (totalChecked > 0) salUi.checked = true;
+		return totalChecked;
+	}
+})(jQuery);

@@ -1,0 +1,77 @@
+
+.nwcsMainDiv {
+	background-color: #ededed;
+	position: absolute !important;
+	color: Green !important;
+	font: 11px !important;
+	width: 183px;
+	padding: 5px;
+	border: 1px solid #333;
+	min-height: 45px;
+	z-index: 9999 !important;
+}
+
+	.resultgridhd .forserchfld span {
+		display: block;
+		float: left;
+		color: #333;
+	}
+
+	.resultgridhd .forserchfld input {
+		float: left;
+		width: 80px;
+		padding: 3px;
+	}
+
+	.resultgridhd .srchoption {
+		/* clear:left;*/
+		margin: 0 0 8px 0;
+	}
+
+	.resultgridhd p {
+		color: #556890 !important;
+		padding: 5px 0 5px 0;
+		font: bold 11px/19px arial !important;
+	}
+
+.resultgridhd .srchoption li {
+	line-height: 19px;
+	color: #7e7e7e !important;
+}
+
+.ui-multiselect-checkboxes {
+	position: relative /* fixes bug in IE6/7 */;
+	height:auto !important;
+}
+
+.ui-multiselect-menu {
+	width: 180px !important;
+	max-height:200px !important;
+	height:auto !important;
+	overflow-x:hidden;
+}
+
+.ui-multiselect {
+	width: 180px !important;
+}
+
+.multiselectnohover div {
+	width: 180px;
+}
+
+
+.nwcsMainDiv .ui-multiselect span{
+	float:left;
+	font-size:12px;
+	padding:4px 0 0 0;
+}
+.ui-corner-all{
+	border:0px !important; 
+}
+.nwcsMainDiv .ui-corner-all span{
+	margin:0 0 0 3px;
+}
+
+.ui-multiselect {
+	display:none;
+ }
